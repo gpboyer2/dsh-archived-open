@@ -1,0 +1,60 @@
+{
+  "name": "dsh-archived-open",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness plugin: clicking an archived session in the sidebar unarchives it and opens it in one step.",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gpboyer2/dsh-archived-open.git"
+  },
+  "homepage": "https://github.com/gpboyer2/dsh-archived-open#readme",
+  "bugs": {
+    "url": "https://github.com/gpboyer2/dsh-archived-open/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "archive",
+    "unarchive",
+    "session",
+    "sidebar"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.5"
+  }
+}

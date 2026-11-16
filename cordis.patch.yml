@@ -1,0 +1,10 @@
+# Bundle patch for dsh-archived-open.
+#
+# 只往插件树里插入本插件一行，不改动任何既有配置。
+# 客户端半部（lib/client.js）靠这一行产生的 loader entry 才会被
+# `dsh.client` 扫描到并送进浏览器。
+- insert:
+    - id: archived-open
+      name: dsh-archived-open
+      config:
+        debug: true
