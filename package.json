@@ -1,8 +1,12 @@
 {
   "name": "dsh-archived-open",
   "version": "0.1.0",
-  "description": "DeepSeek Harness plugin: clicking an archived session in the sidebar unarchives it and opens it in one step.",
+  "description": "点侧栏里的归档会话就自动取消归档并打开，省掉「先取消归档、再点开」两步。",
   "license": "MIT",
+  "meta": {
+    "title": "归档会话点开即用",
+    "description": "点侧栏里的归档会话，自动取消归档并直接打开。"
+  },
   "type": "module",
   "main": "lib/index.js",
   "exports": {
