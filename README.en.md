@@ -52,10 +52,10 @@ Verify: after a restart, click one archived session. It unarchives first, then o
 
 | Capability | Description |
 | --- | --- |
-| One click opens | Click an archived session row → unarchive → open that session. |
-| No false hits | The "…" menu, archive / pin buttons, and normal session rows behave as before; double clicks and repeated clicks fire once. |
+| Single step | Click an archived session row → unarchive → open that session. |
+| No false triggers | The "…" menu, archive / pin buttons, and normal session rows behave as before; double clicks and repeated clicks fire once. |
 | Waits for the snapshot | After unarchiving, wait for the local snapshot to leave the archived set before opening, up to 3 seconds. |
-| Failures are visible | When the unarchive is rejected, the log records `error` and the reason, and the UI does not jump. |
+| Failures leave a trace | When the unarchive is rejected, the log records `error` and the reason, and the UI does not jump. |
 | Diagnostic log | Every step is written to `~/.dsh/logs/archived-open.log`, and the latest records can also be fetched through the host trace route. |
 | Zero dependencies | The client bundle uses only two services: `uiWorkspace` and `workspaces`. |
 
