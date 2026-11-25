@@ -1,124 +1,121 @@
 # dsh-archived-open
 
-中文 → [README.md](README.md)
+> **One click, and the archived session opens.** —— Skips the two steps of "unarchive first, then click to open".
 
-## Is this for you?
+[English](README.en.md) · [简体中文](README.md)
 
-DeepSeek Harness (DSH) hides an archived session behind a guard: clicking its
-sidebar row only shows "Archived sessions cannot be opened. Unarchive it to
-view." You have to unarchive first, then click again.
+![DSH](https://img.shields.io/badge/DSH-DeepSeek%20Harness-1F6FEB?style=flat-square)
+![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?style=flat-square&logo=node.js&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ESM-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
+![Cordis](https://img.shields.io/badge/Cordis-plugin-FF6B6B?style=flat-square)
+![tests](https://img.shields.io/badge/tests-4-brightgreen?style=flat-square)
+![license](https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square)
 
-- You archive a lot and keep wanting to look back at old sessions. Install it.
-  One click opens the session.
-- You only want to peek and keep the archive state as it is. Do not install it.
-  This plugin really unarchives — the session returns to the normal list.
-- You never archive, or never reopen archived sessions. Skip it.
+A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (DSH) plugin. When you click an archived session in the sidebar, DSH only shows "Archived conversations cannot be viewed for now. Please unarchive and try again." This plugin replaces that notice with a real action: unarchive first, then open.
+
+## What problem it solves
+
+The DSH 0.2 sidebar funnels clicks on every session row into the same guard: archived sessions are always blocked, with a notice only.
+
+- You archive often, and often want to look back at old sessions. Install it. One click gets you in, no two-step detour.
+- You only want a quick glance and do not want to change archive state. Do not install it. This plugin really does unarchive — the session returns to the normal list.
+- You never archive, or never look at archived sessions again. No need to install.
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["Click an archived session row"] --> B{"Hits data-row-key and is archived?"}
+    B -->|No| C[Let the native click through]
+    B -->|Yes| D[preventDefault + stopPropagation]
+    D --> E[unarchiveSession]
+    E --> F[Wait for the local snapshot to leave the archived set]
+    F --> G[openSession]
+```
+
+- Catch the click first on `document` in the **capture phase**, before DSH's own guard.
+- Act only when `[data-row-key="session:<id>"]` matches and that id is in `archivedSessionIds`; the row's "…" menu and archive/pin buttons are out of scope.
+- Cannot open right after unarchiving: DSH has a rule that "an archived session cannot stay open", so opening while the local snapshot is not yet updated clears the view immediately. The plugin waits up to 3 seconds for the id to disappear from the archived set, then opens.
+- Double clicks and repeated clicks run once; an unarchive failure is not swallowed — one `error` line goes into the log, and the UI does not jump unexpectedly.
 
 ## Quick start
 
 ```sh
-# 1. clone into ~/.dsh/plugins/dsh-archived-open
+# 1. Clone into ~/.dsh/plugins/dsh-archived-open
 git clone https://github.com/gpboyer2/dsh-archived-open.git ~/.dsh/plugins/dsh-archived-open
 
-# 2. register it in the desktop profile
-dsh plugin --profile desktop add link:$HOME/.dsh/plugins/dsh-archived-open
+# 2. Register with the profile (a CLI-managed profile, such as web / main)
+dsh plugin --profile <your-profile> add link:$HOME/.dsh/plugins/dsh-archived-open
 
-# 3. restart DSH
+# 3. Restart DSH
 ```
 
-`dsh.bundle.patch` points at the bundled `cordis.patch.yml`, so the plugin is
-inserted into the plugin tree automatically; there is no profile patch to edit
-by hand.
+> The `desktop` profile is owned exclusively by DeepSeek Harness.app; `dsh plugin --profile desktop …` from the CLI is rejected. For the desktop build, install from the in-app "Plugins" page, or edit the profile's `dependencies` + symlink manually and restart.
 
-After the restart, click any archived session: it is unarchived and opened in
-the same gesture.
+The bundled `cordis.patch.yml` inserts the plugin into the plugin tree automatically; no need to edit the profile patch file by hand.
 
-## What it does
+**Verify**: after restart, click any archived session. It unarchives first, then opens directly.
 
-**It fuses "unarchive" and "open" into one click.**
+## Core features
 
-- Clicking an archived row in the sidebar unarchives the session and opens it.
-- The row's own controls (the "…" menu, archive/pin buttons) behave as before.
-- Double clicks and repeated clicks restore once.
-- A rejected unarchive is not swallowed: it writes an `error` line instead of
-  silently jumping the view somewhere else.
-
-## How it works
-
-DSH 0.2 funnels every session-row click through one guard:
-
-```js
-const guardedOpen = (sessionId) => {
-  if (archivedSessionIds.includes(sessionId)) {
-    notifyArchivedNotOpenable()
-    return
-  }
-  open(sessionId)
-}
-```
-
-An archived session can therefore never be opened. Unarchiving itself is a
-shipped capability (`uiWorkspace.unarchiveSession`); it is simply not wired to
-the click.
-
-The plugin intercepts the click first, in the capture phase on `document`:
-
-1. match `[data-row-key="session:<id>"]` where `<id>` is in `archivedSessionIds`;
-2. `preventDefault()` + `stopPropagation()`, so the native toast never fires;
-3. `await unarchiveSession(id)`;
-4. wait for the local snapshot to drop the id (at most 3 seconds);
-5. `openSession(id)`.
-
-Step 4 is mandatory: DSH enforces "an archived session cannot stay open", so
-opening before the snapshot updates would clear the view right away.
-
-## Diagnostics
-
-Every stage is appended to `~/.dsh/logs/archived-open.log`. If a click does
-nothing, read that file first:
-
-| Last line | Meaning |
+| Capability | Description |
 | --- | --- |
-| nothing at all | The plugin never entered the tree: check `dsh.profile.bundles` in the profile, and that `dsh.bundle.patch` was read |
-| `host-apply` only | Host loaded it, but the client half never reached the browser: check the browser console for bundle errors |
-| `client-apply` only | Running, but no click matched a session row: `nomatch` lines carry the actual `aria-description` and `data-row-key` |
-| `hit` → `unarchived` → `opened` | Working |
-| `error` | The host rejected the unarchive; the reason is on the line |
-
-Each `nomatch` shape is logged once, so the file does not flood.
+| **One click opens** | Click an archived session row in the sidebar → unarchive automatically → open that session. |
+| **No collateral damage** | The "…" menu, archive/pin buttons, and normal session rows behave as before; double clicks and repeated clicks fire once. |
+| **Waits for the snapshot** | After unarchiving, waits for the local snapshot to actually leave the archived set before opening, up to 3 seconds, so the "an archived session cannot stay open" rule does not clear it. |
+| **Failures are visible** | A rejected unarchive is not swallowed: the log records `error` and the reason, and the UI does not jump. |
+| **Diagnostic log** | Every step is written to `~/.dsh/logs/archived-open.log`, and the latest records can also be fetched via the host trace route. |
+| **Zero dependencies** | The client bundle uses only two DSH services: `uiWorkspace` and `workspaces`. |
 
 ## Configuration
 
-| Option | Default | Meaning |
+| Option | Default | Description |
 | --- | --- | --- |
-| `debug` | `true` | Write diagnostics and register the trace route |
-| `logFile` | `~/.dsh/logs/archived-open.log` | Where diagnostics go |
+| `debug` | `true` | Whether to write the diagnostic log and register the trace route. |
+| `logFile` | `~/.dsh/logs/archived-open.log` | Log location. |
 
-Set them in `cordis.patch.yml`'s `config:` block, or override them from the
-profile patch layer. With `debug: false` the trace route is not registered at
-all and nothing is written.
+Change it in `config:` of `cordis.patch.yml`, or override the plugin row in the profile's patch layer. With `debug: false` the trace route is not registered at all and not a single log line is written.
 
-## Tests
+## Logs and diagnostics
+
+If one click does nothing, check the last lines of `~/.dsh/logs/archived-open.log` first:
+
+| Last entry in the log | Description |
+| --- | --- |
+| nothing at all | The plugin did not enter the plugin tree: check whether the profile's `dsh.profile.bundles` contains `dsh-archived-open`, and whether the package's `dsh.bundle.patch` is read. |
+| nothing after `host-apply` | The host loaded the plugin, but the client half did not reach the browser: check the browser console for bundle errors. |
+| nothing after `client-apply` | The plugin is running, but the click did not hit a session row; the `nomatch` line carries the `aria-description` and `data-row-key` actually seen. |
+| `hit` → `unarchived` → `opened` | Normal. |
+| `error` | The host rejected the unarchive; the reason is at the end of the line. |
+
+`nomatch` is logged once per shape and does not flood the log.
+
+## Architecture
+
+```
+lib/index.js          host half: registers the trace route, reads the log
+lib/client.js         client half: captures clicks, unarchives, waits for the snapshot, opens the session
+cordis.patch.yml      bundle patch: inserts the plugin row
+test/                 4 client behavior tests + host trace tests
+```
+
+Design constraint: do not take over sidebar rendering, only one click event; all state comes from DSH's public client services, no DOM guessing.
+
+## Development and testing
 
 ```sh
 npm test
 ```
 
-Four tests: archived rows are intercepted, row controls pass through, live rows
-pass through, repeated clicks restore once — plus the host trace route's write
-path and rejection of malformed bodies.
+4 tests: 1 client behavior test (intercepts archived rows, lets in-row controls through, lets normal rows through, repeated clicks fire once; runs on a DOM mock, no network) and 3 host trace route tests (writes one line, rejects a bad request, the whole route is not registered with `debug: false`).
 
 ## Known limits
 
-- **Archived rows in search results are not handled.** Those rows carry no
-  session id in the DOM, so the plugin cannot identify the target; the native
-  toast still appears there. Sidebar rows are unaffected.
-- **Opening unarchives.** There is no "re-archive after leaving", because that
-  would make sessions jump around the list — worse than the original friction.
-- **A DSH restart is required.** Client bundles are scanned at startup.
-- Targets DSH 0.2.x desktop/web clients and depends on the `uiWorkspace` and
-  `workspaces` client services.
+- **Archived rows in search results cannot be clicked.** That row's DOM has no session id, so the plugin cannot resolve the target, and the native notice still shows. Sidebar rows are unaffected.
+- **Opening means unarchiving.** The plugin does not "re-archive automatically after viewing", because that would make the session jump around the list, which is more annoying than the original problem.
+- **DSH must be restarted to take effect.** The client bundle is scanned at startup.
+- Only targets the DSH 0.2.x desktop/Web client; depends on the two client services `uiWorkspace` and `workspaces`.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE)

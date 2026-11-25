@@ -1,14 +1,42 @@
 # dsh-archived-open
 
-English → [README.en.md](README.en.md)
+> **点一下，归档的会话就开了。** —— 省掉「先取消归档、再点开」那两步。
 
-## 适合你吗？
+[简体中文](README.md) · [English](README.en.md)
 
-DSH 把会话归档以后，侧栏筛「全部对话」还能看见它，但点开只会弹一句「已归档对话暂时无法查看，请取消归档后查看」。得先右键取消归档、再点一次，才能进去看。
+![DSH](https://img.shields.io/badge/DSH-DeepSeek%20Harness-1F6FEB?style=flat-square)
+![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?style=flat-square&logo=node.js&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ESM-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
+![Cordis](https://img.shields.io/badge/Cordis-plugin-FF6B6B?style=flat-square)
+![tests](https://img.shields.io/badge/tests-4-brightgreen?style=flat-square)
+![license](https://img.shields.io/badge/license-MIT-brightgreen?style=flat-square)
 
-- 你经常归档，又经常想回头翻某个旧会话。装。点一下就进去，不用再走两步。
-- 你只是想瞟一眼、并不想改归档状态。别装。这个插件是真的会取消归档——会话会回到普通列表里。
+一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）插件。归档会话在侧栏里点开时，DSH 只弹一句「已归档对话暂时无法查看，请取消归档后查看」。本插件把这个提示换成真正的动作：先取消归档，再打开。
+
+## 它解决什么问题
+
+DSH 0.2 的侧栏对所有会话行点击收口到同一个守卫：归档的会话一律拦下，只给提示。
+
+- 你经常归档，又经常想回头翻旧会话。装。点一下就进去，不用再走两步。
+- 你只是想瞟一眼、并不想改归档状态。别装。这个插件是真的会取消归档——会话会回到普通列表。
 - 你从不归档，或者归档了就再也不看。不用装。
+
+## 工作原理
+
+```mermaid
+flowchart LR
+    A["点击归档会话行"] --> B{"命中 data-row-key 且已归档?"}
+    B -->|否| C[放行原生点击]
+    B -->|是| D[preventDefault + stopPropagation]
+    D --> E[unarchiveSession]
+    E --> F[等本地快照移出归档集合]
+    F --> G[openSession]
+```
+
+- 在 `document` 的 **capture 阶段**先接住点击，早于 DSH 自己的守卫。
+- 命中 `[data-row-key="session:<id>"]` 且该 id 在 `archivedSessionIds` 里才动手；行内的「…」菜单、归档/置顶按钮不在拦截范围。
+- 取消归档后不能立刻打开：DSH 有一条「归档会话不能保持打开」的规则，本地快照还没更新就打开，视图会被立刻清掉。插件最多等 3 秒，等它从归档集合里消失再开。
+- 双击、连点只执行一次；取消归档失败不吞错，日志里记一条 `error`，界面不会莫名其妙跳走。
 
 ## 快速开始
 
@@ -16,89 +44,78 @@ DSH 把会话归档以后，侧栏筛「全部对话」还能看见它，但点�
 # 1. 克隆到 ~/.dsh/plugins/dsh-archived-open
 git clone https://github.com/gpboyer2/dsh-archived-open.git ~/.dsh/plugins/dsh-archived-open
 
-# 2. 注册到 desktop profile
-dsh plugin --profile desktop add link:$HOME/.dsh/plugins/dsh-archived-open
+# 2. 注册到 profile（命令行管理的 profile，如 web / main）
+dsh plugin --profile <你的profile> add link:$HOME/.dsh/plugins/dsh-archived-open
 
 # 3. 重启 DSH
 ```
 
-`package.json` 里的 `dsh.bundle.patch` 指向自带的 `cordis.patch.yml`，会把插件自动插进插件树；不用手改 profile 的 patch 文件。
+> `desktop` profile 由 DeepSeek Harness.app 独占，命令行 `dsh plugin --profile desktop …` 会被拒。桌面版在应用内「插件」页安装，或手动改 profile 的 `dependencies` + 软链后重启。
 
-重启后随便点一个归档会话。它会先取消归档，然后直接打开。
+包内的 `cordis.patch.yml` 会把插件自动插进插件树，不用手改 profile 的 patch 文件。
 
-## 它做的事
+**验证**：重启后随便点一个归档会话。它会先取消归档，然后直接打开。
 
-一句话：**把「取消归档」和「打开」接成一个动作。**
+## 核心功能
 
-- 点侧栏里的归档会话行 → 自动取消归档 → 打开该会话。
-- 行内的「…」菜单、归档/置顶按钮照旧，点它们不会触发自动取消归档。
-- 双击、连点只会执行一次。
-- 取消归档失败时不吞错：日志里记一条 `error`，界面不会莫名其妙跳走。
-
-## 原理
-
-DSH 0.2 的侧栏把所有会话行点击都收口到一个守卫里：
-
-```js
-const guardedOpen = (sessionId) => {
-  if (archivedSessionIds.includes(sessionId)) {
-    notifyArchivedNotOpenable()
-    return
-  }
-  open(sessionId)
-}
-```
-
-归档会话因此永远进不去。但「取消归档」本身是官方能力（`uiWorkspace.unarchiveSession`），只是没有和点击连起来。
-
-本插件在 `document` 的 capture 阶段先接住点击：
-
-1. 命中 `[data-row-key="session:<id>"]`，且这个 id 在 `archivedSessionIds` 里；
-2. `preventDefault()` + `stopPropagation()`，拦掉原生的提示；
-3. `await unarchiveSession(id)`；
-4. 等本地快照把它从归档集合里去掉（最多 3 秒）；
-5. `openSession(id)`。
-
-第 4 步不能省：DSH 有一条「归档会话不能保持打开」的规则，快照还没更新就打开，视图会被立刻清掉。
-
-## 诊断
-
-插件把每一步写进 `~/.dsh/logs/archived-open.log`。点了一次没反应，先看这个文件：
-
-| 日志里最后出现 | 说明 |
+| 能力 | 说明 |
 | --- | --- |
-| 什么都没有 | 插件没进插件树：检查 profile 的 `dsh.profile.bundles` 是否含 `dsh-archived-open`，以及包的 `dsh.bundle.patch` 是否被读到 |
-| `host-apply` 之后没有了 | 宿主加载了插件，但客户端半部没送到浏览器：看浏览器控制台有没有 bundle 报错 |
-| `client-apply` 之后没有了 | 插件在跑，但点击没命中会话行：`nomatch` 行会带上实际看到的 `aria-description` 与 `data-row-key` |
-| `hit` → `unarchived` → `opened` | 正常 |
-| `error` | 取消归档被宿主拒绝，行尾带原因 |
-
-`nomatch` 每种形态只记一次，不会刷屏。
+| **一点即开** | 点侧栏里的归档会话行 → 自动取消归档 → 打开该会话。 |
+| **不误伤** | 「…」菜单、归档/置顶按钮、普通会话行照旧；双击、连点只触发一次。 |
+| **等快照** | 取消归档后等本地快照真正移出归档集合再打开，最多 3 秒，避免被「归档会话不能保持打开」清掉。 |
+| **失败可见** | 取消归档被拒时不吞错：日志记 `error` 与原因，界面不跳走。 |
+| **诊断日志** | 每一步写进 `~/.dsh/logs/archived-open.log`，还能通过宿主 trace 路由取最近记录。 |
+| **零依赖** | 客户端 bundle 只用 DSH 的 `uiWorkspace`、`workspaces` 两个服务。 |
 
 ## 配置
 
 | 配置 | 默认 | 说明 |
 | --- | --- | --- |
-| `debug` | `true` | 是否写诊断日志并注册 trace 路由 |
-| `logFile` | `~/.dsh/logs/archived-open.log` | 日志位置 |
+| `debug` | `true` | 是否写诊断日志并注册 trace 路由。 |
+| `logFile` | `~/.dsh/logs/archived-open.log` | 日志位置。 |
 
-在 `cordis.patch.yml` 的 `config:` 里改，或者装成插件后在 profile 的 patch 层覆盖。`debug: false` 时连 trace 路由都不注册，日志一行不写。
+在 `cordis.patch.yml` 的 `config:` 里改，或者在 profile 的 patch 层覆盖插件行。`debug: false` 时连 trace 路由都不注册，日志一行不写。
 
-## 测试
+## 日志与诊断
+
+点了一次没反应，先看 `~/.dsh/logs/archived-open.log` 最后几行：
+
+| 日志里最后出现 | 说明 |
+| --- | --- |
+| 什么都没有 | 插件没进插件树：检查 profile 的 `dsh.profile.bundles` 是否含 `dsh-archived-open`，以及包的 `dsh.bundle.patch` 是否被读到。 |
+| `host-apply` 之后没有了 | 宿主加载了插件，但客户端半部没送到浏览器：看浏览器控制台有没有 bundle 报错。 |
+| `client-apply` 之后没有了 | 插件在跑，但点击没命中会话行；`nomatch` 行会带上实际看到的 `aria-description` 与 `data-row-key`。 |
+| `hit` → `unarchived` → `opened` | 正常。 |
+| `error` | 取消归档被宿主拒绝，行尾带原因。 |
+
+`nomatch` 每种形态只记一次，不会刷屏。
+
+## 架构
+
+```
+lib/index.js          宿主半：注册 trace 路由、读日志
+lib/client.js         客户端半：capture 点击、取消归档、等快照、打开会话
+cordis.patch.yml      bundle patch：插入插件行
+test/                 4 条客户端行为测试 + 宿主 trace 测试
+```
+
+设计约束：不接管侧栏渲染，只接一个点击事件；所有状态来自 DSH 公开的客户端服务，不猜 DOM。
+
+## 开发与测试
 
 ```sh
 npm test
 ```
 
-4 个测试：拦截归档行、放行行内控件、放行普通行、连点只触发一次；外加宿主 trace 路由的写入与坏请求拒绝。
+4 条：客户端行为 1 条（拦截归档行、放行行内控件、放行普通行、连点只触发一次，跑在 DOM mock 上，不出网），宿主 trace 路由 3 条（写入一行、坏请求拒绝、`debug: false` 时整条路由不注册）。
 
 ## 已知边界
 
-- **搜索结果里的归档行点不了。** 那一行 DOM 上没有会话 id，插件拿不到目标，仍旧走原生的提示。侧栏的行不受影响。
+- **搜索结果里的归档行点不了。** 那一行 DOM 上没有会话 id，插件拿不到目标，仍旧走原生提示。侧栏的行不受影响。
 - **打开即取消归档。** 插件不做「看完自动重新归档」，因为那会让会话在列表里跳来跳去，比原问题更烦。
 - **必须重启 DSH 才生效。** 客户端 bundle 是启动时扫描的。
 - 只适配 DSH 0.2.x 的桌面/Web 客户端；依赖 `uiWorkspace`、`workspaces` 两个客户端服务。
 
 ## 许可证
 
-MIT。全文见 [MIT](LICENSE)。
+[MIT](LICENSE)
