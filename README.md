@@ -33,13 +33,14 @@ flowchart LR
 ## 快速开始
 
 ```sh
-# 1. 克隆到 ~/.dsh/plugins/dsh-archived-open
-git clone https://github.com/gpboyer2/dsh-archived-open.git ~/.dsh/plugins/dsh-archived-open
+# 直接从 GitHub 安装（命令行管理的 profile，如 web / main）
+dsh plugin --profile <你的profile> add github:gpboyer2/dsh-archived-open
 
-# 2. 注册到 profile（命令行管理的 profile，如 web / main）
+# 本地开发：克隆到 ~/.dsh/plugins/dsh-archived-open，改用本地软链安装
+git clone https://github.com/gpboyer2/dsh-archived-open.git ~/.dsh/plugins/dsh-archived-open
 dsh plugin --profile <你的profile> add link:$HOME/.dsh/plugins/dsh-archived-open
 
-# 3. 重启 DSH
+# 重启 DSH
 ```
 
 `desktop` profile 由 DeepSeek Harness.app 独占，命令行会被拒。桌面版在应用内「插件」页安装，或手动改 profile 的 `dependencies` 加软链后重启。

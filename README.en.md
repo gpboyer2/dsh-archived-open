@@ -33,13 +33,14 @@ flowchart LR
 ## Quick start
 
 ```sh
-# 1. Clone to ~/.dsh/plugins/dsh-archived-open
-git clone https://github.com/gpboyer2/dsh-archived-open.git ~/.dsh/plugins/dsh-archived-open
+# Install straight from GitHub (a CLI-managed profile such as web / main)
+dsh plugin --profile <your-profile> add github:gpboyer2/dsh-archived-open
 
-# 2. Register with the profile (a CLI-managed profile such as web / main)
+# Local development: clone to ~/.dsh/plugins/dsh-archived-open and install through a local link
+git clone https://github.com/gpboyer2/dsh-archived-open.git ~/.dsh/plugins/dsh-archived-open
 dsh plugin --profile <your-profile> add link:$HOME/.dsh/plugins/dsh-archived-open
 
-# 3. Restart DSH
+# Restart DSH
 ```
 
 The `desktop` profile is owned exclusively by DeepSeek Harness.app, and the CLI rejects it. On the desktop build, install from the in-app "Plugins" page, or edit the profile's `dependencies` to add the symlink by hand, then restart.
